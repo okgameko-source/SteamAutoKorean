@@ -1,0 +1,14 @@
+Supported source languages -> Korean
+Japanese: jpn
+English: eng
+Chinese Simplified: chi_sim
+Chinese Traditional: chi_tra
+Spanish: spa
+French: fra
+German: deu
+Italian: ita
+Portuguese: por
+Russian: rus
+
+Windows Tesseract must have the corresponding .traineddata language packs installed.
+Automatic heuristic detection is used for status/context; OCR itself runs the installed multilingual set.

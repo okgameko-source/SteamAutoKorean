@@ -1,0 +1,110 @@
+name: Build Windows Setup EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check source files
+        shell: powershell
+        run: |
+          $files = @("app.py","requirements.txt","SingleSetup.nsi","app.ico")
+          foreach ($f in $files) {
+            if (!(Test-Path $f)) { throw "필수 파일 없음: $f" }
+          }
+          python -m py_compile app.py
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          choco install nsis --yes --no-progress
+          choco install tesseract --yes --no-progress
+
+      - name: Build Steam Auto Korean
+        shell: powershell
+        run: |
+          pyinstaller --noconfirm --clean --windowed --icon app.ico --name SteamAutoKorean app.py
+          if (!(Test-Path "dist\SteamAutoKorean\SteamAutoKorean.exe")) {
+            throw "SteamAutoKorean.exe 생성 실패"
+          }
+
+      - name: Bundle Tesseract
+        shell: powershell
+        run: |
+          $src = "C:\Program Files\Tesseract-OCR"
+          if (!(Test-Path "$src\tesseract.exe")) {
+            $cmd = (Get-Command tesseract.exe -ErrorAction Stop).Source
+            $src = Split-Path $cmd
+          }
+
+          New-Item -ItemType Directory -Force "dist\SteamAutoKorean\tesseract" | Out-Null
+          Copy-Item "$src\*" "dist\SteamAutoKorean\tesseract" -Recurse -Force
+
+      - name: Download OCR languages
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $td = "dist\SteamAutoKorean\tesseract\tessdata"
+          New-Item -ItemType Directory -Force $td | Out-Null
+
+          $langs = @(
+            "eng","jpn","chi_sim","chi_tra",
+            "spa","fra","deu","ita","por","rus",
+            "tha","vie","ind","tur","pol","nld"
+          )
+
+          foreach ($lang in $langs) {
+            Invoke-WebRequest `
+              -Uri "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/$lang.traineddata" `
+              -OutFile "$td\$lang.traineddata"
+          }
+
+      - name: Build Setup EXE
+        shell: powershell
+        run: |
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+
+          if (!(Test-Path $nsis)) {
+            $nsis = (Get-Command makensis.exe -ErrorAction Stop).Source
+          }
+
+          & $nsis SingleSetup.nsi
+
+          if (!(Test-Path "SteamAutoKorean_Setup.exe")) {
+            throw "Setup.exe 생성 실패"
+          }
+
+      - name: Create SHA256
+        shell: powershell
+        run: |
+          (Get-FileHash "SteamAutoKorean_Setup.exe" -Algorithm SHA256).Hash |
+            Out-File -Encoding ascii "SteamAutoKorean_Setup_SHA256.txt"
+
+      - name: Upload Setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: SteamAutoKorean-Windows11-Setup
+          path: |
+            SteamAutoKorean_Setup.exe
+            SteamAutoKorean_Setup_SHA256.txt
+          if-no-files-found: error
+          retention-days: 30

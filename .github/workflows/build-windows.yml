@@ -3,51 +3,60 @@ name: Build Windows Setup EXE
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+    tags: [ "v*" ]
 
 jobs:
-  build:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required files
+        shell: bash
+        run: |
+          set -e
+          test -f app.py
+          test -f requirements.txt
+          test -f SingleSetup.nsi
+          test -f app.ico
+          python -m py_compile app.py
+
+  build-windows:
+    needs: preflight
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
-      - name: Check source files
-        shell: powershell
-        run: |
-          $files = @("app.py","requirements.txt","SingleSetup.nsi","app.ico")
-          foreach ($f in $files) {
-            if (!(Test-Path $f)) { throw "필수 파일 없음: $f" }
-          }
-          python -m py_compile app.py
-
-      - name: Install build tools
+      - name: Install Python dependencies
         shell: powershell
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Install NSIS and Tesseract
+        shell: powershell
+        run: |
           choco install nsis --yes --no-progress
           choco install tesseract --yes --no-progress
 
-      - name: Build Steam Auto Korean
+      - name: Build application
         shell: powershell
         run: |
           pyinstaller --noconfirm --clean --windowed --icon app.ico --name SteamAutoKorean app.py
-          if (!(Test-Path "dist\SteamAutoKorean\SteamAutoKorean.exe")) {
-            throw "SteamAutoKorean.exe 생성 실패"
-          }
+          if (!(Test-Path "dist\SteamAutoKorean\SteamAutoKorean.exe")) { throw "Application EXE missing" }
 
-      - name: Bundle Tesseract
+      - name: Bundle Tesseract runtime
         shell: powershell
         run: |
           $src = "C:\Program Files\Tesseract-OCR"
@@ -55,56 +64,178 @@ jobs:
             $cmd = (Get-Command tesseract.exe -ErrorAction Stop).Source
             $src = Split-Path $cmd
           }
-
           New-Item -ItemType Directory -Force "dist\SteamAutoKorean\tesseract" | Out-Null
           Copy-Item "$src\*" "dist\SteamAutoKorean\tesseract" -Recurse -Force
+          if (!(Test-Path "dist\SteamAutoKorean\tesseract\tesseract.exe")) { throw "Bundled Tesseract missing" }
 
-      - name: Download OCR languages
+      - name: Download multilingual OCR data
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
           $td = "dist\SteamAutoKorean\tesseract\tessdata"
           New-Item -ItemType Directory -Force $td | Out-Null
-
-          $langs = @(
-            "eng","jpn","chi_sim","chi_tra",
-            "spa","fra","deu","ita","por","rus",
-            "tha","vie","ind","tur","pol","nld"
-          )
-
+          $langs = @("eng","jpn","chi_sim","chi_tra","spa","fra","deu","ita","por","rus","tha","vie","ind","tur","pol","nld")
           foreach ($lang in $langs) {
-            Invoke-WebRequest `
-              -Uri "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/$lang.traineddata" `
-              -OutFile "$td\$lang.traineddata"
+            $url = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/$lang.traineddata"
+            Invoke-WebRequest -Uri $url -OutFile "$td\$lang.traineddata"
+            if ((Get-Item "$td\$lang.traineddata").Length -lt 10000) { throw "Bad OCR data: $lang" }
           }
 
-      - name: Build Setup EXE
+      - name: Build installer
         shell: powershell
         run: |
           $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
-
-          if (!(Test-Path $nsis)) {
-            $nsis = (Get-Command makensis.exe -ErrorAction Stop).Source
-          }
-
+          if (!(Test-Path $nsis)) { $nsis = (Get-Command makensis.exe -ErrorAction Stop).Source }
           & $nsis SingleSetup.nsi
+          if ($LASTEXITCODE -ne 0) { throw "NSIS failed" }
+          if (!(Test-Path "SteamAutoKorean_Setup.exe")) { throw "Setup EXE missing" }
 
-          if (!(Test-Path "SteamAutoKorean_Setup.exe")) {
-            throw "Setup.exe 생성 실패"
-          }
+      - name: Optional code signing
+        if: ${{ secrets.WINDOWS_CERT_BASE64 != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
+        shell: powershell
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:CERT_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$signtool) { throw "signtool.exe not found" }
+          & $signtool.FullName sign /f $certPath /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "SteamAutoKorean_Setup.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Code signing failed" }
+          Remove-Item $certPath -Force
 
-      - name: Create SHA256
+      - name: Validate output and create hashes
         shell: powershell
         run: |
-          (Get-FileHash "SteamAutoKorean_Setup.exe" -Algorithm SHA256).Hash |
-            Out-File -Encoding ascii "SteamAutoKorean_Setup_SHA256.txt"
+          $setup = Get-Item "SteamAutoKorean_Setup.exe"
+          if ($setup.Length -lt 1000000) { throw "Setup EXE unexpectedly small" }
+          $bytes = [IO.File]::ReadAllBytes($setup.FullName)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Setup is not a valid PE/MZ executable" }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
+          $hash | Out-File -Encoding ascii "SteamAutoKorean_Setup_SHA256.txt"
+          $check = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
+          if ($hash -ne $check) { throw "SHA256 verification mismatch" }
+          Get-ChildItem "dist\SteamAutoKorean" -Recurse | Select-Object FullName,Length | Out-File -Encoding utf8 "Build_File_Inventory.txt"
+          "PE header: PASS`nSHA256 roundtrip: PASS`nSize: $($setup.Length)" | Out-File -Encoding ascii "Binary_Validation.txt"
 
-      - name: Upload Setup
+      - name: Smoke test installer
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installDir = "$env:LOCALAPPDATA\Programs\SteamAutoKorean"
+          if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
+
+          Write-Host "Silent installing..."
+          $p = Start-Process ".\SteamAutoKorean_Setup.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
+
+          $exe = Join-Path $installDir "SteamAutoKorean.exe"
+          $tess = Join-Path $installDir "tesseract\tesseract.exe"
+          $uninstall = Join-Path $installDir "Uninstall.exe"
+          if (!(Test-Path $exe)) { throw "Installed application EXE missing" }
+          if (!(Test-Path $tess)) { throw "Installed Tesseract missing" }
+          if (!(Test-Path $uninstall)) { throw "Uninstaller missing" }
+
+          $langs = @("eng","jpn","chi_sim","chi_tra","spa","fra","deu","ita","por","rus","tha","vie","ind","tur","pol","nld")
+          foreach ($lang in $langs) {
+            $f = Join-Path $installDir "tesseract\tessdata\$lang.traineddata"
+            if (!(Test-Path $f)) { throw "Installed OCR language missing: $lang" }
+          }
+
+          Write-Host "Runtime checking bundled Tesseract..."
+          $tessOutput = & $tess --version 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "Bundled Tesseract failed to start" }
+          $langsOutput = & $tess --list-langs 2>&1
+          foreach ($lang in $langs) {
+            if (($langsOutput -join "`n") -notmatch "(?m)^$([regex]::Escape($lang))$") {
+              throw "Tesseract does not report language: $lang"
+            }
+          }
+
+          Write-Host "Launching installed application..."
+          $app = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) {
+            throw "SteamAutoKorean exited during startup. Exit code: $($app.ExitCode)"
+          }
+          Stop-Process -Id $app.Id -Force
+          Start-Sleep -Seconds 1
+
+          $diag = Join-Path $installDir "data\diagnostic.log"
+          if (Test-Path $diag) {
+            $recent = Get-Content $diag -Tail 80 -ErrorAction SilentlyContinue
+            $recent | Out-File -Encoding utf8 "Startup_Diagnostic_Log.txt"
+          } else {
+            "No startup diagnostic errors recorded." | Out-File -Encoding utf8 "Startup_Diagnostic_Log.txt"
+          }
+
+          Write-Host "Application startup smoke test PASS."
+
+          Write-Host "Upgrade/data persistence smoke test..."
+          $userData = "$env:LOCALAPPDATA\SteamAutoKorean\data"
+          New-Item -ItemType Directory -Force $userData | Out-Null
+          $sentinel = Join-Path $userData "upgrade_test_sentinel.txt"
+          "KEEP-ME-v4.9" | Out-File -Encoding ascii $sentinel
+
+          # Install the same package again to simulate an in-place upgrade.
+          $up = Start-Process ".\SteamAutoKorean_Setup.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($up.ExitCode -ne 0) { throw "Upgrade installer exit code $($up.ExitCode)" }
+          if (!(Test-Path $sentinel)) { throw "User data lost during upgrade" }
+          if ((Get-Content $sentinel -Raw).Trim() -ne "KEEP-ME-v4.9") { throw "User data changed during upgrade" }
+
+          $app2 = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 5
+          if ($app2.HasExited) { throw "Application failed after upgrade. Exit code: $($app2.ExitCode)" }
+          Stop-Process -Id $app2.Id -Force
+
+          "Upgrade install: PASS`nUser data persistence: PASS`nPost-upgrade startup: PASS" | Out-File -Encoding ascii "Upgrade_Smoke_Test.txt"
+
+          Write-Host "Silent uninstalling..."
+          $u = Start-Process $uninstall -ArgumentList "/S" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path $exe) { throw "Application EXE remains after uninstall" }
+          if (!(Test-Path $sentinel)) { throw "User data was removed by uninstall" }
+          Remove-Item $sentinel -Force -ErrorAction SilentlyContinue
+
+          "Installer + startup + upgrade smoke test PASS" | Out-File -Encoding ascii "Installer_Smoke_Test.txt"
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: SteamAutoKorean-Windows11-Setup
           path: |
             SteamAutoKorean_Setup.exe
             SteamAutoKorean_Setup_SHA256.txt
+            Build_File_Inventory.txt
+            Installer_Smoke_Test.txt
+            Startup_Diagnostic_Log.txt
+            Binary_Validation.txt
+            Upgrade_Smoke_Test.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload QA logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SteamAutoKorean-Build-QA-Logs
+          path: |
+            SteamAutoKorean_Setup_SHA256.txt
+            Build_File_Inventory.txt
+            Binary_Validation.txt
+            Upgrade_Smoke_Test.txt
+            Installer_Smoke_Test.txt
+            Startup_Diagnostic_Log.txt
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Attach to GitHub Release for version tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SteamAutoKorean_Setup.exe
+            SteamAutoKorean_Setup_SHA256.txt

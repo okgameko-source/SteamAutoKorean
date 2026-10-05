@@ -1,0 +1,13 @@
+{
+  "source_lang": "jpn+eng",
+  "interval_ms": 1200,
+  "font_size": 24,
+  "region": null,
+  "profile": "Other / PC game",
+  "overlay_x": 80,
+  "overlay_y": 700,
+  "overlay_w": 1200,
+  "overlay_h": 220,
+  "tesseract_cmd": "",
+  "translation_mode": "argos"
+}

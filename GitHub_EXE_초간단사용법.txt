@@ -1,0 +1,20 @@
+Steam Auto Korean v4.8
+
+일반 사용:
+GitHub -> Actions -> Build Windows Setup EXE -> Run workflow
+성공 후 SteamAutoKorean-Windows11-Setup Artifact 다운로드.
+
+v4.8 추가 검사:
+- Setup.exe PE/MZ 실행파일 헤더 확인
+- 최소 파일 크기 확인
+- SHA-256 생성 후 즉시 재검증
+- 빌드 파일 전체 목록 보존
+- 설치/첫 실행/Tesseract/16개 언어팩/제거 스모크 테스트
+- 성공/실패와 관계없이 가능한 QA 로그를 별도 Artifact로 보존
+
+선택적 코드서명:
+GitHub Secrets에 WINDOWS_CERT_BASE64와 WINDOWS_CERT_PASSWORD를 넣으면
+Setup.exe를 SHA-256 + timestamp 방식으로 자동 서명합니다.
+인증서가 없으면 서명 단계만 건너뛰고 정상 빌드됩니다.
+
+주의: 코드서명 인증서는 사용자가 정식으로 보유한 인증서를 사용해야 합니다.

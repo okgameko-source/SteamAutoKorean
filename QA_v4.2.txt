@@ -1,0 +1,18 @@
+[PASS] Windows AST + py_compile
+[PASS] Windows genre UI
+[PASS] Windows genre profiles
+[PASS] Windows genre debounce
+[PASS] Windows genre TTL
+[PASS] Android Manifest XML
+[PASS] GenreProfile.kt brace balance
+[PASS] CaptureService.kt brace balance
+[PASS] BlockOverlayManager.kt brace balance
+[PASS] MainActivity.kt brace balance
+[PASS] OfflineKoreanTranslator.kt brace balance
+[PASS] TranslationStore.kt brace balance
+[PASS] Android genre delay
+[PASS] Android genre box count
+[PASS] Android genre TTL
+[PASS] Android genre selector
+[INFO] Genre profiles are performance presets, not game-content classifiers yet; Auto uses balanced defaults.
+[INFO] Real-device/game tuning remains required.

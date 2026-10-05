@@ -1,0 +1,28 @@
+[PASS] Windows AST + py_compile
+[PASS] Windows OCR spa
+[PASS] Windows OCR fra
+[PASS] Windows OCR deu
+[PASS] Windows OCR ita
+[PASS] Windows OCR por
+[PASS] Windows OCR rus
+[PASS] Windows detector es
+[PASS] Windows detector fr
+[PASS] Windows detector de
+[PASS] Windows detector it
+[PASS] Windows detector pt
+[PASS] Windows detector ru
+[PASS] Android Manifest XML
+[PASS] Android Spanish
+[PASS] Android French
+[PASS] Android German
+[PASS] Android Italian
+[PASS] Android Portuguese
+[PASS] Android Russian
+[PASS] Android language lock
+[PASS] OfflineKoreanTranslator.kt brace balance
+[PASS] LanguageProfile.kt brace balance
+[PASS] CaptureService.kt brace balance
+[PASS] TranslationStore.kt brace balance
+[PASS] MainActivity.kt brace balance
+[INFO] Western-language heuristic detection is lightweight, not a full statistical language detector; game-specific language lock is the reliable override.
+[INFO] Real OCR accuracy requires the matching Windows Tesseract packs and Android device/model testing.

@@ -1,0 +1,13 @@
+[PASS] Windows AST + py_compile
+[PASS] auto game finder
+[PASS] profile recommendation
+[PASS] existing profile guard
+[PASS] genre persistence
+[PASS] display persistence
+[PASS] capture persistence
+[PASS] background persistence
+[PASS] profile restore
+[PASS] GitHub workflow YAML
+[PASS] upgrade QA
+[PASS] startup QA
+[PASS] binary QA

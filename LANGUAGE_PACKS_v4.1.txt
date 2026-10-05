@@ -1,0 +1,10 @@
+Additional v4.1 languages -> Korean:
+Thai tha
+Vietnamese vie
+Indonesian ind
+Turkish tur
+Polish pol
+Dutch nld
+Plus all v4.0 languages.
+Install matching Tesseract traineddata files.
+character_rules.json provides a foundation for fixed character names/honorific expressions.

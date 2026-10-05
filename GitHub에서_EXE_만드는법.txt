@@ -1,0 +1,19 @@
+Steam Auto Korean - GitHub 자동 Windows 빌드
+
+처음 한 번:
+1. GitHub에서 새 저장소를 만듭니다.
+2. 이 ZIP 안의 파일/폴더를 저장소 최상위에 올립니다.
+   .github 폴더도 반드시 같이 올립니다.
+3. GitHub 저장소의 Actions 탭을 엽니다.
+4. 왼쪽에서 'Build Windows Setup EXE' 선택
+5. 'Run workflow' 클릭
+6. 빌드가 끝나면 실행 결과 페이지 아래 Artifacts에서
+   'SteamAutoKorean-Windows11-Setup' 다운로드
+
+압축 안에:
+- SteamAutoKorean_Setup.exe
+- SteamAutoKorean_Setup_SHA256.txt
+
+이후 Setup.exe만 보관/배포하면 됩니다.
+
+main 브랜치에 새 버전을 올려도 자동으로 다시 빌드됩니다.

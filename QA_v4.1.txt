@@ -1,0 +1,23 @@
+[PASS] Windows AST + py_compile
+[PASS] Windows OCR tha
+[PASS] Windows OCR vie
+[PASS] Windows OCR ind
+[PASS] Windows OCR tur
+[PASS] Windows OCR pol
+[PASS] Windows OCR nld
+[PASS] Android Manifest XML
+[PASS] Android Thai
+[PASS] Android Vietnamese
+[PASS] Android Indonesian
+[PASS] Android Turkish
+[PASS] Android Polish
+[PASS] Android Dutch
+[PASS] OfflineKoreanTranslator.kt brace balance
+[PASS] CaptureService.kt brace balance
+[PASS] CharacterRules.kt brace balance
+[PASS] TranslationStore.kt brace balance
+[PASS] MainActivity.kt brace balance
+[PASS] Android character expression rules applied
+[PASS] Android character rules safe save
+[INFO] Language heuristics remain lightweight; explicit language lock is recommended when a game uses one known language.
+[INFO] Character style feature is deterministic user-confirmed replacement, not generative persona rewriting.

@@ -1,0 +1,19 @@
+Steam Auto Korean - Windows 11 Pro
+
+최종 사용자 설치법
+
+1. SteamAutoKorean_Setup.exe 더블클릭
+2. '설치' 클릭
+3. 완료
+4. 바탕화면의 'Steam Auto Korean' 아이콘 실행
+
+끝입니다.
+
+최종 사용자는 Python, PyInstaller, NSIS, Tesseract를 따로 설치할 필요가 없도록
+단일 설치 프로그램에 필요한 실행 구성요소를 포함하는 배포 구조입니다.
+
+주의:
+현재 이 ZIP은 Setup.exe를 만드는 '배포 프로젝트'입니다.
+이 환경에서는 Windows Setup.exe 자체를 컴파일할 수 없습니다.
+빌드 PC에서 portable Tesseract와 언어팩을 tesseract 폴더에 넣고
+BUILD_SINGLE_SETUP.bat을 한 번 실행하면 최종 SteamAutoKorean_Setup.exe가 생성됩니다.

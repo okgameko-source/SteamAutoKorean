@@ -1,0 +1,5 @@
+PySide6>=6.7
+Pillow>=10
+pytesseract>=0.3.10
+argostranslate>=1.9.6
+pyinstaller>=6
